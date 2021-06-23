@@ -10,8 +10,12 @@ import UIKit
 class TodoeyViewController: UITableViewController {
     
     var itemArray = ["Buy Eggs","Buy Bread","Buy butter"]
+    let defaults = UserDefaults.standard
     override func viewDidLoad() {
         super.viewDidLoad()
+        if let item = defaults.array(forKey: "TodoListArray") as? [String]{
+            itemArray = item
+        }
         // Do any additional setup after loading the view.
     }
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -39,6 +43,7 @@ class TodoeyViewController: UITableViewController {
         
         let action = UIAlertAction(title: "Add Item", style: .default) { (alert) in
             self.itemArray.append(itemTextField.text!)
+            self.defaults.set(self.itemArray, forKey: "TodoListArray")
             self.tableView.reloadData()
         }
         alert.addTextField { (alertTextField) in
