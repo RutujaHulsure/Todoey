@@ -6,23 +6,24 @@
 //
 
 import UIKit
+import CoreData
 
 class TodoeyViewController: UITableViewController {
     
     var itemArray = [Item]()
-    //let defaults = UserDefaults.standard
-    let filePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
+    var selectedCategory : Category? {
+        didSet{
+            loadItem()
+        }
+    }
+   
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
         
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        
-        loadItem()
-        
-//        if let item = defaults.array(forKey: "TodoListArray") as? [Item]{
-//            itemArray = item
-//        }
-        // Do any additional setup after loading the view.
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
+
     }
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return itemArray.count
@@ -53,11 +54,12 @@ class TodoeyViewController: UITableViewController {
         
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             
-            let newItem = Item()
+            let newItem = Item(context: self.context)
             newItem.title = itemTextField.text!
+            newItem.done = false
+            newItem.parentCategory = self.selectedCategory
             self.itemArray.append(newItem)
             self.saveItems()
-            //self.defaults.set(self.itemArray, forKey: "TodoListArray")
             
         }
         alert.addTextField { (alertTextField) in
@@ -69,23 +71,50 @@ class TodoeyViewController: UITableViewController {
             present(alert, animated: true, completion: nil)
         }
     func saveItems(){
-        let encoder = PropertyListEncoder()
         do{
-            let data = try encoder.encode(itemArray)
-            try data.write(to: filePath!)
+            try context.save()
         }catch{
-            print("error encoding item array,\(error)")
+           print("error saving context \(error)")
         }
         self.tableView.reloadData()
     }
-    func loadItem(){
-        if let data = try? Data(contentsOf: filePath!){
-            let decoder = PropertyListDecoder()
-            do{
-                itemArray = try decoder.decode([Item].self, from: data)
-            }catch{
-                print("error decoding itemarray,\(error)")
-            }
+    func loadItem(with request : NSFetchRequest<Item> = Item.fetchRequest(), predicate:NSPredicate? = nil){
+        
+        let categoryPredicate = NSPredicate(format: "parentCategory.name MATCHES %@",selectedCategory!.name!)
+        if let additionalPredicate = predicate{
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate,additionalPredicate])
+        }
+//        let compoundPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate,predicate])
+//        request.predicate = compoundPredicate
+        
+        do{
+           itemArray = try context.fetch(request)
+        }catch{
+            print("Error in fetching data in context \(error)")
+        }
+        tableView.reloadData()
+    }
+
+}
+extension TodoeyViewController : UISearchBarDelegate{
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        
+        let request : NSFetchRequest<Item> = Item.fetchRequest()
+        
+        let predicate = NSPredicate(format: "title CONTAINS [cd] %@", searchBar.text!)
+                
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        
+        loadItem(with: request,predicate: predicate)
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0{
+            loadItem()
+            DispatchQueue.main.async {
+                        searchBar.resignFirstResponder()
+        }
+        
         }
     }
 }
